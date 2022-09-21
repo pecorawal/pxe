@@ -1,0 +1,67 @@
+
+= Procedimento criação PXE
+
+O servidor de tFtp é responsável por efetuar o disparo da instalação do CoreOS, uma vez que a VM foi iniciada como boot padrão PXE ele busca um ip no DHCP que após fornecido conduz o processo de boot para um servidor tFtp o qual foram criados menus com as diferentes roles (bootstrap, master,
+worker). Cada uma das roles possuem parametros de inicialização de S.O. e arquivos de configuração distintos (ignition).
+
+Para configuração do tftp foram necessários no bastion com S.O. RHEL 8.x ou equivalente da comunidade para a instalação dos pacotes:
+
+[source]
+----
+syslinux-tftpboot-6.04-5.el8.noarch
+syslinux-nonlinux-6.04-5.el8.noarch
+syslinux-6.04-5.el8.x86_64
+tftp-server-5.2-24.el8.x86_64
+----
+
+Após instalados os pacotes foram copiados os arquivos do diretório /usr/share/syslinux para /var/lib/tftpboot.
+
+Para configuração do tftp server, os diretórios adicionais foram criados:
+
+[source]
+----
+/var/lib/tftpboot/networkboot/coreOS
+/var/lib/tftpboot/pxelinux.cfg
+----
+
+No diretório /var/lib/tftpboot/networkboot/coreOS os arquivos de imagem, kernel e memória foram adicionados conforme demonstra o trecho a seguir:
+
+
+[source]
+----
+├── networkboot
+│ └── coreOS
+│ ├── rhcos-4.8.2-x86_64-live-initramfs.x86_64.img
+│ ├── rhcos-4.8.2-x86_64-live-kernel-x86_64
+│ └── rhcos-4.8.2-x86_64-live-rootfs.x86_64.img
+----
+
+
+No diretório /var/lib/tftpboot/pxelinux.cfg o arquivo default deve conter o menu grub com as opções necessárias a cada tipo de node desejado e apontamento adequado para o servidor Http com o ignition config respectivo.
+
+*/var/lib/tftpboot/pxelinux.cfg/default*
+[source]
+----
+UI vesamenu.c32
+MENU COLOR sel 4 #ffffff std
+MENU COLOR title 0 #ffffff
+TIMEOUT 120
+PROMPT 0
+MENU TITLE OPENSHIFT 4.x INSTALL BAREMETAL PXE MENU
+
+LABEL INSTALL BOOTSTRAP
+KERNEL networkboot/coreOS/rhcos-4.8.2-x86_64-live-kernel-x86_64
+APPEND initrd=networkboot/coreOS/rhcos-4.8.2-x86_64-live-initramfs.x86_64.img,networkboot/coreOS/rhcos-4.8.2-x86_64-live-rootfs.x86_64.img coreos.inst.install_dev=/dev/sda
+coreos.inst.ignition_url=http://172.19.10.2:81/ignition/bootstrap.ign
+
+LABEL INSTALL MASTER
+KERNEL networkboot/coreOS/rhcos-4.8.2-x86_64-live-kernel-x86_64
+APPEND initrd=networkboot/coreOS/rhcos-4.8.2-x86_64-live-initramfs.x86_64.img,networkboot/coreOS/rhcos-4.8.2-x86_64-live-rootfs.x86_64.img coreos.inst.install_dev=/dev/sda
+coreos.inst.ignition_url=http://172.19.10.2:81/ignition/master.ign
+
+LABEL INSTALL WORKER
+KERNEL networkboot/coreOS/rhcos-4.8.2-x86_64-live-kernel-x86_64
+APPEND initrd=networkboot/coreOS/rhcos-4.8.2-x86_64-live-initramfs.x86_64.img,networkboot/coreOS/rhcos-4.8.2-x86_64-live-rootfs.x86_64.img coreos.inst.install_dev=/dev/sda
+coreos.inst.ignition_url=http://172.19.10.2:81/ignition/worker.ign
+
+----
